@@ -1,0 +1,51 @@
+services:
+  postgres_db:
+    image: postgres:15
+    container_name: postgres_db
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin123
+      POSTGRES_DB: analytics_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./db/init:/docker-entrypoint-initdb.d
+      - pg_data:/var/lib/postgresql/data
+
+  jupyter_lab:
+    image: jupyter/scipy-notebook:latest
+    container_name: jupyter_lab
+    ports:
+      - "8888:8888"
+    volumes:
+      - ./notebooks:/home/jovyan/notebooks
+      - ./src:/home/jovyan/src
+      - ./data:/home/jovyan/data
+    environment:
+      - JUPYTER_ENABLE_LAB=yes
+    depends_on:
+      - postgres_db
+
+  flask_api:
+    build:
+      context: .
+      dockerfile: dockerfile.api
+    container_name: flask_api
+    ports:
+      - "5000:5000"
+    depends_on:
+      - postgres_db
+
+  streamlit_app:
+    build:
+      context: .
+      dockerfile: dockerfile.streamlit
+    container_name: streamlit_app
+    ports:
+      - "8501:8501"
+    depends_on:
+      - postgres_db
+      - flask_api
+
+volumes:
+  pg_data:

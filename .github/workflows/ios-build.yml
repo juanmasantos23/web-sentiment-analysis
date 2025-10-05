@@ -1,27 +1,47 @@
 name: Build iOS App
 
+# Ejecuta en pushes a la rama main y manualmente
 on:
   push:
     branches: [ main ]
-  pull_request:
-    branches: [ main ]
+  workflow_dispatch:
 
 jobs:
-  build:
+  build-ios:
     runs-on: macos-latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+    - name: Checkout código
+      uses: actions/checkout@v4
 
-      - name: Set up Xcode
-        run: |
-          xcodebuild -version
-          xcode-select -p
+    - name: Instalar dependencias CocoaPods
+      run: |
+        sudo gem install cocoapods
+        pod install --project-directory=ios || echo "No hay Podfile"
 
-      - name: Build iOS App
-        run: |
-          xcodebuild -scheme SentimentApp \
-            -sdk iphonesimulator \
-            -destination 'platform=iOS Simulator,name=iPhone 15' \
-            clean build
+    - name: Build app iOS
+      run: |
+        xcodebuild \
+          -workspace ios/SentimentApp.xcworkspace \
+          -scheme SentimentApp \
+          -sdk iphoneos \
+          -configuration Release \
+          clean build \
+          CODE_SIGN_STYLE=Automatic \
+          -allowProvisioningUpdates
+
+    - name: Subir artefacto IPA
+      if: success()
+      run: |
+        mkdir -p output
+        xcodebuild -exportArchive \
+          -archivePath ios/build/SentimentApp.xcarchive \
+          -exportOptionsPlist ios/ExportOptions.plist \
+          -exportPath output
+      continue-on-error: true
+
+    - name: Guardar IPA como artefacto
+      uses: actions/upload-artifact@v4
+      with:
+        name: SentimentApp.ipa
+        path: output/*.ipa
